@@ -5,6 +5,8 @@ from os import replace
 from encoding_tools import TheSoCalledGreatEncoder, GuessEncodingFailedException
 
 
+
+
 def GenOathKey(oath_key):
     s2_out = subprocess.check_output(
         [sys.executable, "C:\\Users\\sharany\\Setup_python\\oathtool", oath_key])
