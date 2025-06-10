@@ -7,7 +7,7 @@ app = FastAPI()
 
 def GenOathKey(oath_key: str) -> str:
     try:
-        # Generate the OTP using oathtool
+        # NOTE: You may need to update this path for Linux on Render
         s2_out = subprocess.check_output(
             [sys.executable, "C:\\Users\\sharany\\Setup_python\\oathtool", oath_key]
         )
@@ -21,19 +21,17 @@ def GenOathKey(oath_key: str) -> str:
         raise HTTPException(status_code=500, detail="Error calling oathtool") from e
 
 @app.post("/generate-otp")
-async def generate_otp(master_key: str ):
+async def generate_otp(master_key: str):
     try:
         otp = GenOathKey(master_key)
         return {"otp": otp}
     except ValueError as ve:
+        print("ValueError:", ve)
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
+        import traceback
+        traceback.print_exc()  # <== This will show the exact error in logs
         raise HTTPException(status_code=500, detail="Internal Server Error")
-
-# ✅ Add this block just before the "if __name__..." block
-@app.get("/")
-def read_root():
-    return {"status": "OK", "message": "OTP service is running"}
 
 if __name__ == "__main__":
     import uvicorn
