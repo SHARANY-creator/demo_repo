@@ -21,7 +21,7 @@ def GenOathKey(oath_key: str) -> str:
         raise HTTPException(status_code=500, detail="Error calling oathtool") from e
 
 @app.post("/generate-otp")
-async def generate_otp(master_key: str):
+async def generate_otp(master_key: str ):
     try:
         otp = GenOathKey(master_key)
         return {"otp": otp}
@@ -29,6 +29,11 @@ async def generate_otp(master_key: str):
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+# ✅ Add this block just before the "if __name__..." block
+@app.get("/")
+def read_root():
+    return {"status": "OK", "message": "OTP service is running"}
 
 if __name__ == "__main__":
     import uvicorn
