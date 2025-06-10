@@ -5,9 +5,13 @@ from encoding_tools import TheSoCalledGreatEncoder, GuessEncodingFailedException
 
 app = FastAPI()
 
+@app.get("/")
+def read_root():
+    return {"status": "OK", "message": "OTP service is running"}
+
 def GenOathKey(oath_key: str) -> str:
     try:
-        # NOTE: You may need to update this path for Linux on Render
+        # Generate the OTP using oathtool
         s2_out = subprocess.check_output(
             [sys.executable, "C:\\Users\\sharany\\Setup_python\\oathtool", oath_key]
         )
@@ -30,7 +34,7 @@ async def generate_otp(master_key: str):
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         import traceback
-        traceback.print_exc()  # <== This will show the exact error in logs
+        traceback.print_exc()  # This prints detailed error to the Render logs
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 if __name__ == "__main__":
