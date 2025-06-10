@@ -1,52 +1,35 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import subprocess
-import sys
-from encoding_tools import TheSoCalledGreatEncoder, GuessEncodingFailedException
+from pydantic import BaseModel, Field
+import pyotp
+import traceback
 
 app = FastAPI()
 
-# Add a root endpoint so / doesn't give 404
+# Health check endpoint
 @app.get("/")
-def read_root():
+def root():
     return {"status": "OK", "message": "OTP service is running"}
 
-# Request model for POST body
+# Request model with validation
 class OTPRequest(BaseModel):
-    master_key: str
+    master_key: str = Field(..., min_length=16, description="Base32 encoded TOTP master key")
 
-# Core OTP generation logic
-def GenOathKey(oath_key: str) -> str:
-    try:
-        # Call oathtool (adjust path if needed)
-        s2_out = subprocess.check_output(
-            [sys.executable, "C:\\Users\\sharany\\Setup_python\\oathtool", oath_key]
-        )
-        # Decode the output using your custom encoder
-        encoder = TheSoCalledGreatEncoder()
-        encoder.load_bytes(s2_out)
-        encoder.decode()
-        return encoder.decoded_data.replace('\r\n', '')
-    except GuessEncodingFailedException as e:
-        raise ValueError('Failed to decode OTP') from e
-    except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail="Error calling oathtool") from e
-
-# OTP generation API endpoint
+# OTP generation endpoint
 @app.post("/generate-otp")
 async def generate_otp(req: OTPRequest):
     try:
-        otp = GenOathKey(req.master_key)
-        return {"otp": otp}
-    except ValueError as ve:
-        print("ValueError:", ve)
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
-        import traceback
-        traceback.print_exc()  # Full error traceback
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        # Validate master_key format
+        if not req.master_key.isalnum():
+            raise HTTPException(status_code=400, detail="master_key must be alphanumeric")
 
-# Run locally (Render ignores this, but useful for local dev)
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=10000)
+        # Generate OTP
+        totp = pyotp.TOTP(req.master_key)
+        otp = totp.now()
+        return {"otp": otp}
+
+    except HTTPException as he:
+        raise he  # Let FastAPI handle known exceptions
+    except Exception as e:
+        # Log unexpected errors for debugging
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to generate OTP due to server error")
