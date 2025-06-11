@@ -1,54 +1,42 @@
-(async function() {
-    // Prevent re-execution
-    if (window.__otpFetched) return;
-    window.__otpFetched = true;
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+import pyotp
+import os
+import time
+import logging
+from pydantic import BaseModel
 
-    try {
-        // Fetch OTP from your API
-        const response = await fetch("https://otp-service-elig.onrender.com/generate-otp", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                "master_key": "SZJLKA2HXHVXALFD72OOFHJNZBKOVNGO"
-            })
-        });
+app = FastAPI()
 
-        const data = await response.json();
-        const otp = data.otp;
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # You can restrict this in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-        console.log("✅ Fetched OTP:", otp);
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 
-        // Wait for the OTP input field to be available (max 10s)
-        const waitForInput = async (selector, timeout = 10000) => {
-            const interval = 200;
-            const maxTries = timeout / interval;
-            let attempts = 0;
-            return new Promise((resolve, reject) => {
-                const timer = setInterval(() => {
-                    const el = document.querySelector(selector);
-                    if (el) {
-                        clearInterval(timer);
-                        resolve(el);
-                    } else if (++attempts >= maxTries) {
-                        clearInterval(timer);
-                        reject(new Error("❌ OTP input field not found within timeout"));
-                    }
-                }, interval);
-            });
-        };
+# Secure master key (shared secret for OTP generation)
+MASTER_KEY = os.getenv("MASTER_KEY", "SZJLKA2HXHVXALFD72OOFHJNZBKOVNGO")
 
-        // Try multiple selectors based on common PingID implementations
-        const otpInput = await waitForInput('input[type="text"], input[autocomplete="one-time-code"], input');
+class OTPRequest(BaseModel):
+    master_key: str
 
-        // Insert the OTP and trigger input event
-        otpInput.value = otp;
-        otpInput.dispatchEvent(new Event('input', { bubbles: true }));
+@app.post("/generate-otp")
+async def generate_otp(request: OTPRequest):
+    if request.master_key != MASTER_KEY:
+        logging.warning("Invalid master key attempt")
+        return {"error": "Unauthorized"}, 401
 
-        console.log("✅ OTP inserted into input field");
+    logging.info("OTP generation request received")
 
-    } catch (error) {
-        console.error("❌ Error during OTP fetch or entry:", error);
-    }
-})();
+    # Wait for the OTP input field to be available (max 10s)
+    totp = pyotp.TOTP(MASTER_KEY)
+    otp = totp.now()
+
+    logging.info(f"Generated OTP: {otp}")
+    return {"otp": otp}
